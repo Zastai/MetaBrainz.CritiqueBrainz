@@ -189,7 +189,7 @@ namespace MetaBrainz.CritiqueBrainz {
 
     private async Task<AuthorizationToken> ProcessResponseAsync(HttpWebResponse response) {
       Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
-#if NETSTD_GE_2_1 || NETCORE_GE_3_0
+#if NETSTANDARD2_1 || NETCOREAPP3_1
       var stream = response.GetResponseStream();
       await using var _ = stream.ConfigureAwait(false);
 #else
@@ -200,8 +200,7 @@ namespace MetaBrainz.CritiqueBrainz {
       var characterSet = response.CharacterSet;
       if (characterSet == null || characterSet.Trim().Length == 0)
         characterSet = "utf-8";
-#if NETSTD_GE_2_1 || NETCORE_GE_3_0
-      // FIXME: Because this uses the stream directly, we can't show the JSON in debug builds.
+#if !DEBUG
       if (characterSet == "utf-8") // Directly use the stream
         return await JsonSerializer.DeserializeAsync<AuthorizationToken>(stream);
 #endif
@@ -240,7 +239,7 @@ namespace MetaBrainz.CritiqueBrainz {
     }
 
     private async Task<HttpWebResponse> SendRequestAsync(HttpWebRequest req, string body) {
-#if NETSTD_GE_2_1 || NETCORE_GE_3_0
+#if NETSTANDARD2_1 || NETCOREAPP3_1
       var rs = req.GetRequestStream();
       await using var _ = rs.ConfigureAwait(false);
 #else
