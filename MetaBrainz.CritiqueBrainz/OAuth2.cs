@@ -90,8 +90,8 @@ namespace MetaBrainz.CritiqueBrainz {
     /// <paramref name="code"/>.
     /// </param>
     /// <returns>The obtained bearer token.</returns>
-    public async Task<IAuthorizationToken> GetBearerTokenAsync(string code, string clientSecret, Uri redirectUri)
-      => await this.RequestTokenAsync("bearer", code, clientSecret, redirectUri, false);
+    public Task<IAuthorizationToken> GetBearerTokenAsync(string code, string clientSecret, Uri redirectUri)
+      => this.RequestTokenAsync("bearer", code, clientSecret, redirectUri, false);
 
     /// <summary>Refreshes a bearer token.</summary>
     /// <param name="refreshToken">The refresh token to use.</param>
@@ -104,8 +104,8 @@ namespace MetaBrainz.CritiqueBrainz {
     /// <param name="refreshToken">The refresh token to use.</param>
     /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
     /// <returns>The obtained bearer token.</returns>
-    public async Task<IAuthorizationToken> RefreshBearerTokenAsync(string refreshToken, string clientSecret)
-      => await this.RequestTokenAsync("bearer", refreshToken, clientSecret, null, true);
+    public Task<IAuthorizationToken> RefreshBearerTokenAsync(string refreshToken, string clientSecret)
+      => this.RequestTokenAsync("bearer", refreshToken, clientSecret, null, true);
 
     #endregion
 
@@ -144,16 +144,16 @@ namespace MetaBrainz.CritiqueBrainz {
     private HttpWebRequest CreateTokenRequest() {
       var uri = this.BuildEndPointUri(OAuth2.TokenEndPoint);
       Debug.Print($"[{DateTime.UtcNow}] OAUTH2 REQUEST: {uri.Uri}");
-      var req = WebRequest.Create(uri.Uri) as HttpWebRequest;
-      if (req == null)
-        throw new InvalidOperationException("Only HTTP-compatible URL schemes are supported.");
-      req.Method      = "POST";
-      req.ContentType = "application/x-www-form-urlencoded; charset=utf-8";
-      {
-        var an = Assembly.GetExecutingAssembly().GetName();
-        req.UserAgent = $"{an.Name}/{an.Version}";
+      if (WebRequest.Create(uri.Uri) is HttpWebRequest req) {
+        req.Method = "POST";
+        req.ContentType = "application/x-www-form-urlencoded; charset=utf-8";
+        {
+          var an = Assembly.GetExecutingAssembly().GetName();
+          req.UserAgent = $"{an.Name}/{an.Version}";
+        }
+        return req;
       }
-      return req;
+      throw new InvalidOperationException("Only HTTP-compatible URL schemes are supported.");
     }
 
     private string CreateTokenRequestBody(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
@@ -175,25 +175,28 @@ namespace MetaBrainz.CritiqueBrainz {
 
     private AuthorizationToken ProcessResponse(HttpWebResponse response) {
       Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
-      var stream = response.GetResponseStream();
+      using var stream = response.GetResponseStream();
       if (stream == null)
         throw new WebException("No data received.", WebExceptionStatus.ReceiveFailure);
-      var encoding = Encoding.UTF8;
-      if (response.CharacterSet != null && response.CharacterSet.Trim().Length > 0)
-        encoding = Encoding.GetEncoding(response.CharacterSet);
-      using var sr = new StreamReader(stream, encoding);
+      var characterSet = response.CharacterSet;
+      if (characterSet == null || characterSet.Trim().Length == 0)
+        characterSet = "utf-8";
+      // Note: No direct stream use here (available in async mode only)
+      var enc = Encoding.GetEncoding(characterSet);
+      using var sr = new StreamReader(stream, enc);
       var json = sr.ReadToEnd();
-      Debug.Print($"[{DateTime.UtcNow}] => JSON: {json}");
-      return JsonUtils.Deserialize<AuthorizationToken>(json);
+      Debug.Print($"[{DateTime.UtcNow}] => JSON: {JsonUtils.Prettify(json)}");
+      var token = JsonUtils.Deserialize<AuthorizationToken>(json);
+      return token ?? throw new JsonException("Received null authorization token.");
     }
 
     private async Task<AuthorizationToken> ProcessResponseAsync(HttpWebResponse response) {
       Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
-#if NETSTANDARD2_1 || NETCOREAPP3_1
+#if NETFRAMEWORK || NETCOREAPP2_1
+      using var stream = response.GetResponseStream();
+#else
       var stream = response.GetResponseStream();
       await using var _ = stream.ConfigureAwait(false);
-#else
-      using var stream = response.GetResponseStream();
 #endif
       if (stream == null)
         throw new WebException("No data received.", WebExceptionStatus.ReceiveFailure);
@@ -202,13 +205,14 @@ namespace MetaBrainz.CritiqueBrainz {
         characterSet = "utf-8";
 #if !DEBUG
       if (characterSet == "utf-8") // Directly use the stream
-        return await JsonSerializer.DeserializeAsync<AuthorizationToken>(stream);
+        return await JsonUtils.DeserializeAsync<AuthorizationToken>(stream, OAuth2.JsonReaderOptions);
 #endif
       var enc = Encoding.GetEncoding(characterSet);
       using var sr = new StreamReader(stream, enc);
       var json = await sr.ReadToEndAsync().ConfigureAwait(false);
-      Debug.Print($"[{DateTime.UtcNow}] => JSON: {json}");
-      return JsonUtils.Deserialize<AuthorizationToken>(json);
+      Debug.Print($"[{DateTime.UtcNow}] => JSON: {JsonUtils.Prettify(json)}");
+      var token = JsonUtils.Deserialize<AuthorizationToken>(json);
+      return token ?? throw new JsonException("Received null authorization token.");
     }
 
     private IAuthorizationToken RequestToken(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
@@ -239,11 +243,11 @@ namespace MetaBrainz.CritiqueBrainz {
     }
 
     private async Task<HttpWebResponse> SendRequestAsync(HttpWebRequest req, string body) {
-#if NETSTANDARD2_1 || NETCOREAPP3_1
+#if NETFRAMEWORK || NETCOREAPP2_1
+      using var rs = req.GetRequestStream();
+#else
       var rs = req.GetRequestStream();
       await using var _ = rs.ConfigureAwait(false);
-#else
-      using var rs = req.GetRequestStream();
 #endif
       var bytes = Encoding.UTF8.GetBytes(body);
       await rs.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
