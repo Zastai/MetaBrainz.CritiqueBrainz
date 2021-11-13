@@ -135,6 +135,9 @@ public class OAuth2 {
 
   private static readonly JsonSerializerOptions JsonReaderOptions = JsonUtils.CreateReaderOptions();
 
+  // This will need to be rewritten to use HttpClient. Until then, prevent build failures on net6.0.
+  #pragma warning disable SYSLIB0014
+
   private UriBuilder BuildEndPointUri(string endpoint) {
     if (string.IsNullOrWhiteSpace(this.UrlScheme)) {
       throw new InvalidOperationException("No URL scheme has been set.");
