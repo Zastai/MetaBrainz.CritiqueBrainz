@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -14,254 +14,276 @@ using MetaBrainz.Common.Json;
 using MetaBrainz.CritiqueBrainz.Interfaces;
 using MetaBrainz.CritiqueBrainz.Objects;
 
-namespace MetaBrainz.CritiqueBrainz {
+namespace MetaBrainz.CritiqueBrainz;
 
-  /// <summary>Class providing convenient access to CritiqueBrainz' OAuth2 service.</summary>
-  [PublicAPI]
-  public class OAuth2 {
+/// <summary>Class providing convenient access to CritiqueBrainz' OAuth2 service.</summary>
+[PublicAPI]
+public class OAuth2 {
 
-    #region Static Fields / Properties
+  #region Static Fields / Properties
 
-    /// <summary>The endpoint used when requesting authorization.</summary>
-    public const string AuthorizationEndPoint = "/oauth/authorize";
+  /// <summary>The endpoint used when requesting authorization.</summary>
+  public const string AuthorizationEndPoint = "/oauth/authorize";
 
-    /// <summary>The default client ID to use for requests.</summary>
-    /// <remarks>
-    /// To register an application and obtain a client ID, go to
-    /// <a href="https://critiquebrainz.org/profile/applications/">your CritiqueBrainz account</a>.
-    /// </remarks>
-    public static string DefaultClientId { get; set; } = "";
+  /// <summary>The default client ID to use for requests.</summary>
+  /// <remarks>
+  /// To register an application and obtain a client ID, go to
+  /// <a href="https://critiquebrainz.org/profile/applications/">your CritiqueBrainz account</a>.
+  /// </remarks>
+  public static string DefaultClientId { get; set; } = "";
 
-    /// <summary>The default port number to use for requests (-1 to not specify any explicit port).</summary>
-    public static int DefaultPort { get; set; } = -1;
+  /// <summary>The default port number to use for requests (-1 to not specify any explicit port).</summary>
+  public static int DefaultPort { get; set; } = -1;
 
-    /// <summary>The default internet access protocol to use for requests.</summary>
-    public static string DefaultUrlScheme { get; set; } = "https";
+  /// <summary>The default internet access protocol to use for requests.</summary>
+  public static string DefaultUrlScheme { get; set; } = "https";
 
-    /// <summary>The default web site to use for requests.</summary>
-    public static string DefaultWebSite { get; set; } = "critiquebrainz.org";
+  /// <summary>The default web site to use for requests.</summary>
+  public static string DefaultWebSite { get; set; } = "critiquebrainz.org";
 
-    /// <summary>The URI to use for out-of-band authorization.</summary>
-    public static readonly Uri OutOfBandUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
+  /// <summary>The URI to use for out-of-band authorization.</summary>
+  public static readonly Uri OutOfBandUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
 
-    /// <summary>The endpoint used when creating or refreshing a token.</summary>
-    public const string TokenEndPoint = "/ws/1/oauth/token";
+  /// <summary>The endpoint used when creating or refreshing a token.</summary>
+  public const string TokenEndPoint = "/ws/1/oauth/token";
 
-    #endregion
+  #endregion
 
-    #region Public Methods
+  #region Public Methods
 
-    /// <summary>Creates the URI to use to request an authorization code.</summary>
-    /// <param name="redirectUri">The URI that should receive the authorization code; use <see cref="OutOfBandUri"/> for out-of-band requests.</param>
-    /// <param name="scope">The authorization scopes that should be included in the authorization code.</param>
-    /// <param name="state">An optional string that will be included in the response sent to <paramref name="redirectUri"/>.</param>
-    /// <returns>The generated URI.</returns>
-    public Uri CreateAuthorizationRequest(Uri redirectUri, AuthorizationScope scope, string? state = null) {
-      if (scope == AuthorizationScope.None)
-        throw new ArgumentException("At least one authorization scope must be selected.", nameof(scope));
-      var uri = this.BuildEndPointUri(OAuth2.AuthorizationEndPoint);
-      var query = new StringBuilder();
-      query.Append("response_type=code");
-      query.Append("&client_id=").Append(Uri.EscapeDataString(this.ClientId));
-      query.Append("&redirect_uri=").Append(Uri.EscapeDataString(redirectUri.ToString()));
-      query.Append("&scope=").Append(string.Join(",", OAuth2.ScopeStrings(scope)));
-      if (state != null)
-        query.Append("&state=").Append(Uri.EscapeDataString(state));
-      uri.Query = query.ToString();
-      return uri.Uri;
+  /// <summary>Creates the URI to use to request an authorization code.</summary>
+  /// <param name="redirectUri">The URI that should receive the authorization code; use <see cref="OutOfBandUri"/> for out-of-band requests.</param>
+  /// <param name="scope">The authorization scopes that should be included in the authorization code.</param>
+  /// <param name="state">An optional string that will be included in the response sent to <paramref name="redirectUri"/>.</param>
+  /// <returns>The generated URI.</returns>
+  public Uri CreateAuthorizationRequest(Uri redirectUri, AuthorizationScope scope, string? state = null) {
+    if (scope == AuthorizationScope.None) {
+      throw new ArgumentException("At least one authorization scope must be selected.", nameof(scope));
     }
-
-    /// <summary>Exchanges an authorization code for a bearer token.</summary>
-    /// <param name="code">The authorization code to be used. If the request succeeds, this code will be invalidated.</param>
-    /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
-    /// <param name="redirectUri">
-    /// The URI to redirect to (or <see cref="OutOfBandUri"/> for out-of-band requests); must match the request URI used to obtain
-    /// <paramref name="code"/>.
-    /// </param>
-    /// <returns>The obtained bearer token.</returns>
-    public IAuthorizationToken GetBearerToken(string code, string clientSecret, Uri redirectUri)
-      => this.RequestToken("bearer", code, clientSecret, redirectUri, false);
-
-    /// <summary>Exchanges an authorization code for a bearer token.</summary>
-    /// <param name="code">The authorization code to be used. If the request succeeds, this code will be invalidated.</param>
-    /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
-    /// <param name="redirectUri">
-    /// The URI to redirect to (or <see cref="OutOfBandUri"/> for out-of-band requests); must match the request URI used to obtain
-    /// <paramref name="code"/>.
-    /// </param>
-    /// <returns>The obtained bearer token.</returns>
-    public Task<IAuthorizationToken> GetBearerTokenAsync(string code, string clientSecret, Uri redirectUri)
-      => this.RequestTokenAsync("bearer", code, clientSecret, redirectUri, false);
-
-    /// <summary>Refreshes a bearer token.</summary>
-    /// <param name="refreshToken">The refresh token to use.</param>
-    /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
-    /// <returns>The obtained bearer token.</returns>
-    public IAuthorizationToken RefreshBearerToken(string refreshToken, string clientSecret)
-      => this.RequestToken("bearer", refreshToken, clientSecret, null, true);
-
-    /// <summary>Refreshes a bearer token.</summary>
-    /// <param name="refreshToken">The refresh token to use.</param>
-    /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
-    /// <returns>The obtained bearer token.</returns>
-    public Task<IAuthorizationToken> RefreshBearerTokenAsync(string refreshToken, string clientSecret)
-      => this.RequestTokenAsync("bearer", refreshToken, clientSecret, null, true);
-
-    #endregion
-
-    #region Instance Fields / Properties
-
-    /// <summary>The client ID to use for requests.</summary>
-    /// <remarks>
-    /// To register an application and obtain a client ID, go to
-    /// <a href="https://critiquebrainz.org/profile/applications/">your CritiqueBrainz account</a>.
-    /// </remarks>
-    public string ClientId { get; set; } = OAuth2.DefaultClientId;
-
-    /// <summary>The port number to use for requests (-1 to not specify any explicit port).</summary>
-    public int Port { get; set; } = OAuth2.DefaultPort;
-
-    /// <summary>The internet access protocol to use for requests.</summary>
-    public string UrlScheme { get; set; } = OAuth2.DefaultUrlScheme;
-
-    /// <summary>The web site to use for requests.</summary>
-    public string WebSite { get; set; } = OAuth2.DefaultWebSite;
-
-    #endregion
-
-    #region Internals
-
-    private UriBuilder BuildEndPointUri(string endpoint) {
-      if (string.IsNullOrWhiteSpace(this.UrlScheme))
-        throw new InvalidOperationException("No URL scheme has been set.");
-      if (string.IsNullOrWhiteSpace(this.WebSite))
-        throw new InvalidOperationException("No website has been set.");
-      if (string.IsNullOrWhiteSpace(this.ClientId))
-        throw new InvalidOperationException("No client ID has been set.");
-      return new UriBuilder(this.UrlScheme, this.WebSite, this.Port, endpoint);
+    var uri = this.BuildEndPointUri(OAuth2.AuthorizationEndPoint);
+    var query = new StringBuilder();
+    query.Append("response_type=code");
+    query.Append("&client_id=").Append(Uri.EscapeDataString(this.ClientId));
+    query.Append("&redirect_uri=").Append(Uri.EscapeDataString(redirectUri.ToString()));
+    query.Append("&scope=").Append(string.Join(",", OAuth2.ScopeStrings(scope)));
+    if (state != null) {
+      query.Append("&state=").Append(Uri.EscapeDataString(state));
     }
-
-    private HttpWebRequest CreateTokenRequest() {
-      var uri = this.BuildEndPointUri(OAuth2.TokenEndPoint);
-      Debug.Print($"[{DateTime.UtcNow}] OAUTH2 REQUEST: {uri.Uri}");
-      if (WebRequest.Create(uri.Uri) is HttpWebRequest req) {
-        req.Method = "POST";
-        req.ContentType = "application/x-www-form-urlencoded; charset=utf-8";
-        {
-          var an = Assembly.GetExecutingAssembly().GetName();
-          req.UserAgent = $"{an.Name}/{an.Version}";
-        }
-        return req;
-      }
-      throw new InvalidOperationException("Only HTTP-compatible URL schemes are supported.");
-    }
-
-    private string CreateTokenRequestBody(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
-      var body = new StringBuilder();
-      body.Append("client_id=")     .Append(Uri.EscapeDataString(this.ClientId));
-      body.Append("&client_secret=").Append(Uri.EscapeDataString(clientSecret));
-      body.Append("&token_type=")   .Append(Uri.EscapeDataString(type));
-      if (refresh) {
-        body.Append("&grant_type=refresh_token");
-        body.Append("&refresh_token=").Append(Uri.EscapeDataString(codeOrToken));
-      }
-      else {
-        body.Append("&grant_type=authorization_code");
-        body.Append("&code=")        .Append(Uri.EscapeDataString(codeOrToken));
-        body.Append("&redirect_uri=").Append(Uri.EscapeDataString(redirectUri!.ToString()));
-      }
-      return body.ToString();
-    }
-
-    private AuthorizationToken ProcessResponse(HttpWebResponse response) {
-      Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
-      using var stream = response.GetResponseStream();
-      if (stream == null)
-        throw new WebException("No data received.", WebExceptionStatus.ReceiveFailure);
-      var characterSet = response.CharacterSet;
-      if (characterSet == null || characterSet.Trim().Length == 0)
-        characterSet = "utf-8";
-      // Note: No direct stream use here (available in async mode only)
-      var enc = Encoding.GetEncoding(characterSet);
-      using var sr = new StreamReader(stream, enc);
-      var json = sr.ReadToEnd();
-      Debug.Print($"[{DateTime.UtcNow}] => JSON: {JsonUtils.Prettify(json)}");
-      var token = JsonUtils.Deserialize<AuthorizationToken>(json);
-      return token ?? throw new JsonException("Received null authorization token.");
-    }
-
-    private async Task<AuthorizationToken> ProcessResponseAsync(HttpWebResponse response) {
-      Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
-#if NETFRAMEWORK || NETCOREAPP2_1
-      using var stream = response.GetResponseStream();
-#else
-      var stream = response.GetResponseStream();
-      await using var _ = stream.ConfigureAwait(false);
-#endif
-      if (stream == null)
-        throw new WebException("No data received.", WebExceptionStatus.ReceiveFailure);
-      var characterSet = response.CharacterSet;
-      if (characterSet == null || characterSet.Trim().Length == 0)
-        characterSet = "utf-8";
-#if !DEBUG
-      if (characterSet == "utf-8") // Directly use the stream
-        return await JsonUtils.DeserializeAsync<AuthorizationToken>(stream, OAuth2.JsonReaderOptions);
-#endif
-      var enc = Encoding.GetEncoding(characterSet);
-      using var sr = new StreamReader(stream, enc);
-      var json = await sr.ReadToEndAsync().ConfigureAwait(false);
-      Debug.Print($"[{DateTime.UtcNow}] => JSON: {JsonUtils.Prettify(json)}");
-      var token = JsonUtils.Deserialize<AuthorizationToken>(json);
-      return token ?? throw new JsonException("Received null authorization token.");
-    }
-
-    private IAuthorizationToken RequestToken(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
-      var req = this.CreateTokenRequest();
-      var body = this.CreateTokenRequestBody(type, codeOrToken, clientSecret, redirectUri, refresh);
-      using var response = this.SendRequest(req, body);
-      return this.ValidateToken(this.ProcessResponse(response), type);
-    }
-
-    private async Task<IAuthorizationToken> RequestTokenAsync(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
-      var req = this.CreateTokenRequest();
-      var body = this.CreateTokenRequestBody(type, codeOrToken, clientSecret, redirectUri, refresh);
-      using var response = this.SendRequest(req, body);
-      return this.ValidateToken(await this.ProcessResponseAsync(response), type);
-    }
-
-    private static IEnumerable<string> ScopeStrings(AuthorizationScope scope) {
-      if ((scope & AuthorizationScope.Review) != 0) yield return "review";
-      if ((scope & AuthorizationScope.Vote)   != 0) yield return "vote";
-      if ((scope & AuthorizationScope.User)   != 0) yield return "user";
-    }
-
-    private HttpWebResponse SendRequest(HttpWebRequest req, string body) {
-      using var rs = req.GetRequestStream();
-      var bytes = Encoding.UTF8.GetBytes(body);
-      rs.Write(bytes, 0, bytes.Length);
-      return (HttpWebResponse) req.GetResponse();
-    }
-
-    private async Task<HttpWebResponse> SendRequestAsync(HttpWebRequest req, string body) {
-#if NETFRAMEWORK || NETCOREAPP2_1
-      using var rs = req.GetRequestStream();
-#else
-      var rs = req.GetRequestStream();
-      await using var _ = rs.ConfigureAwait(false);
-#endif
-      var bytes = Encoding.UTF8.GetBytes(body);
-      await rs.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
-      return (HttpWebResponse) await req.GetResponseAsync().ConfigureAwait(false);
-    }
-
-    private IAuthorizationToken ValidateToken(AuthorizationToken token, string type) {
-      if (token.TokenType != type)
-        throw new InvalidOperationException($"Token request returned a token of the wrong type ('{token.TokenType}' != '{type}').");
-      return token;
-    }
-
-    #endregion
-
+    uri.Query = query.ToString();
+    return uri.Uri;
   }
+
+  /// <summary>Exchanges an authorization code for a bearer token.</summary>
+  /// <param name="code">The authorization code to be used. If the request succeeds, this code will be invalidated.</param>
+  /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
+  /// <param name="redirectUri">
+  /// The URI to redirect to (or <see cref="OutOfBandUri"/> for out-of-band requests); must match the request URI used to obtain
+  /// <paramref name="code"/>.
+  /// </param>
+  /// <returns>The obtained bearer token.</returns>
+  public IAuthorizationToken GetBearerToken(string code, string clientSecret, Uri redirectUri)
+    => this.RequestToken("bearer", code, clientSecret, redirectUri, false);
+
+  /// <summary>Exchanges an authorization code for a bearer token.</summary>
+  /// <param name="code">The authorization code to be used. If the request succeeds, this code will be invalidated.</param>
+  /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
+  /// <param name="redirectUri">
+  /// The URI to redirect to (or <see cref="OutOfBandUri"/> for out-of-band requests); must match the request URI used to obtain
+  /// <paramref name="code"/>.
+  /// </param>
+  /// <returns>The obtained bearer token.</returns>
+  public Task<IAuthorizationToken> GetBearerTokenAsync(string code, string clientSecret, Uri redirectUri)
+    => this.RequestTokenAsync("bearer", code, clientSecret, redirectUri, false);
+
+  /// <summary>Refreshes a bearer token.</summary>
+  /// <param name="refreshToken">The refresh token to use.</param>
+  /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
+  /// <returns>The obtained bearer token.</returns>
+  public IAuthorizationToken RefreshBearerToken(string refreshToken, string clientSecret)
+    => this.RequestToken("bearer", refreshToken, clientSecret, null, true);
+
+  /// <summary>Refreshes a bearer token.</summary>
+  /// <param name="refreshToken">The refresh token to use.</param>
+  /// <param name="clientSecret">The client secret associated with <see cref="ClientId"/>.</param>
+  /// <returns>The obtained bearer token.</returns>
+  public Task<IAuthorizationToken> RefreshBearerTokenAsync(string refreshToken, string clientSecret)
+    => this.RequestTokenAsync("bearer", refreshToken, clientSecret, null, true);
+
+  #endregion
+
+  #region Instance Fields / Properties
+
+  /// <summary>The client ID to use for requests.</summary>
+  /// <remarks>
+  /// To register an application and obtain a client ID, go to
+  /// <a href="https://critiquebrainz.org/profile/applications/">your CritiqueBrainz account</a>.
+  /// </remarks>
+  public string ClientId { get; set; } = OAuth2.DefaultClientId;
+
+  /// <summary>The port number to use for requests (-1 to not specify any explicit port).</summary>
+  public int Port { get; set; } = OAuth2.DefaultPort;
+
+  /// <summary>The internet access protocol to use for requests.</summary>
+  public string UrlScheme { get; set; } = OAuth2.DefaultUrlScheme;
+
+  /// <summary>The web site to use for requests.</summary>
+  public string WebSite { get; set; } = OAuth2.DefaultWebSite;
+
+  #endregion
+
+  #region Internals
+
+  private static readonly JsonSerializerOptions JsonReaderOptions = JsonUtils.CreateReaderOptions();
+
+  // This will need to be rewritten to use HttpClient. Until then, prevent build failures on net6.0.
+  #pragma warning disable SYSLIB0014
+
+  private UriBuilder BuildEndPointUri(string endpoint) {
+    if (string.IsNullOrWhiteSpace(this.UrlScheme)) {
+      throw new InvalidOperationException("No URL scheme has been set.");
+    }
+    if (string.IsNullOrWhiteSpace(this.WebSite)) {
+      throw new InvalidOperationException("No website has been set.");
+    }
+    if (string.IsNullOrWhiteSpace(this.ClientId)) {
+      throw new InvalidOperationException("No client ID has been set.");
+    }
+    return new UriBuilder(this.UrlScheme, this.WebSite, this.Port, endpoint);
+  }
+
+  private HttpWebRequest CreateTokenRequest() {
+    var uri = this.BuildEndPointUri(OAuth2.TokenEndPoint);
+    Debug.Print($"[{DateTime.UtcNow}] OAUTH2 REQUEST: {uri.Uri}");
+    if (WebRequest.Create(uri.Uri) is HttpWebRequest req) {
+      req.Method = "POST";
+      req.ContentType = "application/x-www-form-urlencoded; charset=utf-8";
+      {
+        var an = Assembly.GetExecutingAssembly().GetName();
+        req.UserAgent = $"{an.Name}/{an.Version}";
+      }
+      return req;
+    }
+    throw new InvalidOperationException("Only HTTP-compatible URL schemes are supported.");
+  }
+
+  private string CreateTokenRequestBody(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
+    var body = new StringBuilder();
+    body.Append("client_id=").Append(Uri.EscapeDataString(this.ClientId));
+    body.Append("&client_secret=").Append(Uri.EscapeDataString(clientSecret));
+    body.Append("&token_type=").Append(Uri.EscapeDataString(type));
+    if (refresh) {
+      body.Append("&grant_type=refresh_token");
+      body.Append("&refresh_token=").Append(Uri.EscapeDataString(codeOrToken));
+    }
+    else {
+      body.Append("&grant_type=authorization_code");
+      body.Append("&code=").Append(Uri.EscapeDataString(codeOrToken));
+      body.Append("&redirect_uri=").Append(Uri.EscapeDataString(redirectUri!.ToString()));
+    }
+    return body.ToString();
+  }
+
+  private AuthorizationToken ProcessResponse(HttpWebResponse response) {
+    Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
+    using var stream = response.GetResponseStream();
+    if (stream == null) {
+      throw new WebException("No data received.", WebExceptionStatus.ReceiveFailure);
+    }
+    var characterSet = response.CharacterSet;
+    if (characterSet == null || characterSet.Trim().Length == 0) {
+      characterSet = "utf-8";
+    }
+    // Note: No direct stream use here (available in async mode only)
+    var enc = Encoding.GetEncoding(characterSet);
+    using var sr = new StreamReader(stream, enc);
+    var json = sr.ReadToEnd();
+    Debug.Print($"[{DateTime.UtcNow}] => JSON: {JsonUtils.Prettify(json)}");
+    var token = JsonUtils.Deserialize<AuthorizationToken>(json);
+    return token ?? throw new JsonException("Received null authorization token.");
+  }
+
+  private async Task<AuthorizationToken> ProcessResponseAsync(HttpWebResponse response) {
+    Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
+#if NET || NETSTANDARD2_1_OR_GREATER
+    var stream = response.GetResponseStream();
+    await using var _ = stream.ConfigureAwait(false);
+#else
+    using var stream = response.GetResponseStream();
+#endif
+    if (stream == null) {
+      throw new WebException("No data received.", WebExceptionStatus.ReceiveFailure);
+    }
+    var characterSet = response.CharacterSet;
+    if (characterSet == null || characterSet.Trim().Length == 0) {
+      characterSet = "utf-8";
+    }
+    AuthorizationToken? token;
+#if !DEBUG
+    if (characterSet == "utf-8") { // Directly use the stream
+      token = await JsonUtils.DeserializeAsync<AuthorizationToken>(stream, OAuth2.JsonReaderOptions);
+      return token ?? throw new JsonException("Received null authorization token.");
+    }
+#endif
+    var enc = Encoding.GetEncoding(characterSet);
+    using var sr = new StreamReader(stream, enc);
+    var json = await sr.ReadToEndAsync().ConfigureAwait(false);
+    Debug.Print($"[{DateTime.UtcNow}] => JSON: {JsonUtils.Prettify(json)}");
+    token = JsonUtils.Deserialize<AuthorizationToken>(json);
+    return token ?? throw new JsonException("Received null authorization token.");
+  }
+
+  private IAuthorizationToken RequestToken(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
+    var req = this.CreateTokenRequest();
+    var body = this.CreateTokenRequestBody(type, codeOrToken, clientSecret, redirectUri, refresh);
+    using var response = this.SendRequest(req, body);
+    return this.ValidateToken(this.ProcessResponse(response), type);
+  }
+
+  private async Task<IAuthorizationToken> RequestTokenAsync(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
+    var req = this.CreateTokenRequest();
+    var body = this.CreateTokenRequestBody(type, codeOrToken, clientSecret, redirectUri, refresh);
+    using var response = this.SendRequest(req, body);
+    return this.ValidateToken(await this.ProcessResponseAsync(response), type);
+  }
+
+  private static IEnumerable<string> ScopeStrings(AuthorizationScope scope) {
+    if ((scope & AuthorizationScope.Review) != 0) {
+      yield return "review";
+    }
+    if ((scope & AuthorizationScope.Vote) != 0) {
+      yield return "vote";
+    }
+    if ((scope & AuthorizationScope.User) != 0) {
+      yield return "user";
+    }
+  }
+
+  private HttpWebResponse SendRequest(HttpWebRequest req, string body) {
+    using var rs = req.GetRequestStream();
+    var bytes = Encoding.UTF8.GetBytes(body);
+    rs.Write(bytes, 0, bytes.Length);
+    return (HttpWebResponse) req.GetResponse();
+  }
+
+  private async Task<HttpWebResponse> SendRequestAsync(HttpWebRequest req, string body) {
+#if NET || NETSTANDARD2_1_OR_GREATER
+    var rs = req.GetRequestStream();
+    await using var _ = rs.ConfigureAwait(false);
+#else
+    using var rs = req.GetRequestStream();
+#endif
+    var bytes = Encoding.UTF8.GetBytes(body);
+    await rs.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+    return (HttpWebResponse) await req.GetResponseAsync().ConfigureAwait(false);
+  }
+
+  private IAuthorizationToken ValidateToken(AuthorizationToken token, string type) {
+    if (token.TokenType != type) {
+      throw new InvalidOperationException($"Token request returned a token of the wrong type ('{token.TokenType}' != '{type}').");
+    }
+    return token;
+  }
+
+  #endregion
 
 }

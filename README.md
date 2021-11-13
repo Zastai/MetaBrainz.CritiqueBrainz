@@ -1,9 +1,12 @@
 # MetaBrainz.CritiqueBrainz [![Build Status](https://img.shields.io/appveyor/build/zastai/metabrainz-critiquebrainz)](https://ci.appveyor.com/project/Zastai/metabrainz-critiquebrainz) [![NuGet Version](https://img.shields.io/nuget/v/MetaBrainz.CritiqueBrainz)](https://www.nuget.org/packages/MetaBrainz.CritiqueBrainz)
 
-This is a library providing access to the [CritiqueBrainz API v1](https://critiquebrainz.readthedocs.io/api.html).
+This is a library providing access to the
+[CritiqueBrainz API v1][api-reference].
 
-[CritiqueBrainz](https://critiquebrainz.org/) is a repository for Creative Commons licensed music reviews; it is based on data from [MusicBrainz](https://musicbrainz.org/), an open music encyclopedia.
+[CritiqueBrainz][home] is a repository for Creative Commons licensed
+music reviews; it is based on data from [MusicBrainz][mb-home], an open
+music encyclopedia.
 
-## Release Notes
-
-No releases yet.
+[home]: https://critiquebrainz.org/
+[mb-home]: https://musicbrainz.org/
+[api-reference]: https://critiquebrainz.readthedocs.io/api.html
