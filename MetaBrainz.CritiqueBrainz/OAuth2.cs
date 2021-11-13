@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -131,6 +131,8 @@ namespace MetaBrainz.CritiqueBrainz {
 
     #region Internals
 
+    private static readonly JsonSerializerOptions JsonReaderOptions = JsonUtils.CreateReaderOptions();
+
     private UriBuilder BuildEndPointUri(string endpoint) {
       if (string.IsNullOrWhiteSpace(this.UrlScheme))
         throw new InvalidOperationException("No URL scheme has been set.");
@@ -192,26 +194,31 @@ namespace MetaBrainz.CritiqueBrainz {
 
     private async Task<AuthorizationToken> ProcessResponseAsync(HttpWebResponse response) {
       Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
-#if NETFRAMEWORK || NETCOREAPP2_1
-      using var stream = response.GetResponseStream();
-#else
+#if NET || NETSTANDARD2_1_OR_GREATER
       var stream = response.GetResponseStream();
       await using var _ = stream.ConfigureAwait(false);
+#else
+      using var stream = response.GetResponseStream();
 #endif
-      if (stream == null)
+      if (stream == null) {
         throw new WebException("No data received.", WebExceptionStatus.ReceiveFailure);
+      }
       var characterSet = response.CharacterSet;
-      if (characterSet == null || characterSet.Trim().Length == 0)
+      if (characterSet == null || characterSet.Trim().Length == 0) {
         characterSet = "utf-8";
+      }
+      AuthorizationToken? token;
 #if !DEBUG
-      if (characterSet == "utf-8") // Directly use the stream
-        return await JsonUtils.DeserializeAsync<AuthorizationToken>(stream, OAuth2.JsonReaderOptions);
+      if (characterSet == "utf-8") { // Directly use the stream
+        token = await JsonUtils.DeserializeAsync<AuthorizationToken>(stream, OAuth2.JsonReaderOptions);
+        return token ?? throw new JsonException("Received null authorization token.");
+      }
 #endif
       var enc = Encoding.GetEncoding(characterSet);
       using var sr = new StreamReader(stream, enc);
       var json = await sr.ReadToEndAsync().ConfigureAwait(false);
       Debug.Print($"[{DateTime.UtcNow}] => JSON: {JsonUtils.Prettify(json)}");
-      var token = JsonUtils.Deserialize<AuthorizationToken>(json);
+      token = JsonUtils.Deserialize<AuthorizationToken>(json);
       return token ?? throw new JsonException("Received null authorization token.");
     }
 
@@ -243,11 +250,11 @@ namespace MetaBrainz.CritiqueBrainz {
     }
 
     private async Task<HttpWebResponse> SendRequestAsync(HttpWebRequest req, string body) {
-#if NETFRAMEWORK || NETCOREAPP2_1
-      using var rs = req.GetRequestStream();
-#else
+#if NET || NETSTANDARD2_1_OR_GREATER
       var rs = req.GetRequestStream();
       await using var _ = rs.ConfigureAwait(false);
+#else
+      using var rs = req.GetRequestStream();
 #endif
       var bytes = Encoding.UTF8.GetBytes(body);
       await rs.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
