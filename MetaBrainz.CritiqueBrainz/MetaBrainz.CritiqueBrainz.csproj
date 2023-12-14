@@ -1,19 +1,26 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="MetaBrainz.Build.Sdk">
+<Project>
+
+  <Sdk Name="MetaBrainz.Build.Sdk" Version="3.1.0" />
 
   <PropertyGroup>
+    <Authors>Zastai</Authors>
     <Title>CritiqueBrainz Web Service Client Library</Title>
     <Description>This package provides classes for accessing the CritiqueBrainz API (v1).</Description>
-    <PackageCopyrightYears>2020</PackageCopyrightYears>
+    <PackageCopyrightOwners>Tim Van Holder</PackageCopyrightOwners>
+    <PackageCopyrightYears>2020, 2023</PackageCopyrightYears>
     <PackageRepositoryName>MetaBrainz.CritiqueBrainz</PackageRepositoryName>
     <PackageTags>CritiqueBrainz music reviews</PackageTags>
     <Version>1.0.0-pre</Version>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <AssemblyIsComVisible>false</AssemblyIsComVisible>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="JetBrains.Annotations" IncludeAssets="compile" PrivateAssets="all" />
     <PackageReference Include="MetaBrainz.Common.Json" />
-    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
 </Project>
