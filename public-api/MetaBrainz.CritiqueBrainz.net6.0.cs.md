@@ -1,0 +1,117 @@
+﻿# API Reference: MetaBrainz.CritiqueBrainz
+
+## Assembly Attributes
+
+```cs
+[assembly: System.Runtime.InteropServices.ComVisibleAttribute(false)]
+[assembly: System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v6.0", FrameworkDisplayName = ".NET 6.0")]
+```
+
+## Namespace: MetaBrainz.CritiqueBrainz
+
+### Type: AuthorizationScope
+
+```cs
+[System.FlagsAttribute]
+public enum AuthorizationScope {
+
+  Everything = -1,
+  None = 0,
+  Review = 1,
+  User = 4,
+  Vote = 2,
+
+}
+```
+
+### Type: OAuth2
+
+```cs
+public class OAuth2 {
+
+  public const string AuthorizationEndPoint = "/oauth/authorize";
+
+  public static readonly System.Uri OutOfBandUri;
+
+  public const string TokenEndPoint = "/ws/1/oauth/token";
+
+  string ClientId {
+    public get;
+    public set;
+  }
+
+  string DefaultClientId {
+    public static get;
+    public static set;
+  }
+
+  int DefaultPort {
+    public static get;
+    public static set;
+  }
+
+  string DefaultUrlScheme {
+    public static get;
+    public static set;
+  }
+
+  string DefaultWebSite {
+    public static get;
+    public static set;
+  }
+
+  int Port {
+    public get;
+    public set;
+  }
+
+  string UrlScheme {
+    public get;
+    public set;
+  }
+
+  string WebSite {
+    public get;
+    public set;
+  }
+
+  public OAuth2();
+
+  public System.Uri CreateAuthorizationRequest(System.Uri redirectUri, AuthorizationScope scope, string? state = null);
+
+  public MetaBrainz.CritiqueBrainz.Interfaces.IAuthorizationToken GetBearerToken(string code, string clientSecret, System.Uri redirectUri);
+
+  public System.Threading.Tasks.Task<MetaBrainz.CritiqueBrainz.Interfaces.IAuthorizationToken> GetBearerTokenAsync(string code, string clientSecret, System.Uri redirectUri);
+
+  public MetaBrainz.CritiqueBrainz.Interfaces.IAuthorizationToken RefreshBearerToken(string refreshToken, string clientSecret);
+
+  public System.Threading.Tasks.Task<MetaBrainz.CritiqueBrainz.Interfaces.IAuthorizationToken> RefreshBearerTokenAsync(string refreshToken, string clientSecret);
+
+}
+```
+
+## Namespace: MetaBrainz.CritiqueBrainz.Interfaces
+
+### Type: IAuthorizationToken
+
+```cs
+public interface IAuthorizationToken : MetaBrainz.Common.Json.IJsonBasedObject {
+
+  string? AccessToken {
+    public abstract get;
+  }
+
+  int Lifetime {
+    public abstract get;
+  }
+
+  string? RefreshToken {
+    public abstract get;
+  }
+
+  string? TokenType {
+    public abstract get;
+  }
+
+}
+```

@@ -42,17 +42,39 @@ public class OAuth2 {
   public static string DefaultWebSite { get; set; } = "critiquebrainz.org";
 
   /// <summary>The URI to use for out-of-band authorization.</summary>
-  public static readonly Uri OutOfBandUri = new Uri("urn:ietf:wg:oauth:2.0:oob");
+  public static readonly Uri OutOfBandUri = new("urn:ietf:wg:oauth:2.0:oob");
 
   /// <summary>The endpoint used when creating or refreshing a token.</summary>
   public const string TokenEndPoint = "/ws/1/oauth/token";
 
   #endregion
 
+  #region Instance Fields / Properties
+
+  /// <summary>The client ID to use for requests.</summary>
+  /// <remarks>
+  /// To register an application and obtain a client ID, go to
+  /// <a href="https://critiquebrainz.org/profile/applications/">your CritiqueBrainz account</a>.
+  /// </remarks>
+  public string ClientId { get; set; } = OAuth2.DefaultClientId;
+
+  /// <summary>The port number to use for requests (-1 to not specify any explicit port).</summary>
+  public int Port { get; set; } = OAuth2.DefaultPort;
+
+  /// <summary>The internet access protocol to use for requests.</summary>
+  public string UrlScheme { get; set; } = OAuth2.DefaultUrlScheme;
+
+  /// <summary>The web site to use for requests.</summary>
+  public string WebSite { get; set; } = OAuth2.DefaultWebSite;
+
+  #endregion
+
   #region Public Methods
 
   /// <summary>Creates the URI to use to request an authorization code.</summary>
-  /// <param name="redirectUri">The URI that should receive the authorization code; use <see cref="OutOfBandUri"/> for out-of-band requests.</param>
+  /// <param name="redirectUri">
+  /// The URI that should receive the authorization code; use <see cref="OutOfBandUri"/> for out-of-band requests.
+  /// </param>
   /// <param name="scope">The authorization scopes that should be included in the authorization code.</param>
   /// <param name="state">An optional string that will be included in the response sent to <paramref name="redirectUri"/>.</param>
   /// <returns>The generated URI.</returns>
@@ -108,26 +130,6 @@ public class OAuth2 {
   /// <returns>The obtained bearer token.</returns>
   public Task<IAuthorizationToken> RefreshBearerTokenAsync(string refreshToken, string clientSecret)
     => this.RequestTokenAsync("bearer", refreshToken, clientSecret, null, true);
-
-  #endregion
-
-  #region Instance Fields / Properties
-
-  /// <summary>The client ID to use for requests.</summary>
-  /// <remarks>
-  /// To register an application and obtain a client ID, go to
-  /// <a href="https://critiquebrainz.org/profile/applications/">your CritiqueBrainz account</a>.
-  /// </remarks>
-  public string ClientId { get; set; } = OAuth2.DefaultClientId;
-
-  /// <summary>The port number to use for requests (-1 to not specify any explicit port).</summary>
-  public int Port { get; set; } = OAuth2.DefaultPort;
-
-  /// <summary>The internet access protocol to use for requests.</summary>
-  public string UrlScheme { get; set; } = OAuth2.DefaultUrlScheme;
-
-  /// <summary>The web site to use for requests.</summary>
-  public string WebSite { get; set; } = OAuth2.DefaultWebSite;
 
   #endregion
 
@@ -204,12 +206,8 @@ public class OAuth2 {
 
   private async Task<AuthorizationToken> ProcessResponseAsync(HttpWebResponse response) {
     Debug.Print($"[{DateTime.UtcNow}] => RESPONSE ({response.ContentType}): {response.ContentLength} bytes");
-#if NET || NETSTANDARD2_1_OR_GREATER
     var stream = response.GetResponseStream();
     await using var _ = stream.ConfigureAwait(false);
-#else
-    using var stream = response.GetResponseStream();
-#endif
     if (stream == null) {
       throw new WebException("No data received.", WebExceptionStatus.ReceiveFailure);
     }
@@ -242,7 +240,7 @@ public class OAuth2 {
   private async Task<IAuthorizationToken> RequestTokenAsync(string type, string codeOrToken, string clientSecret, Uri? redirectUri, bool refresh) {
     var req = this.CreateTokenRequest();
     var body = this.CreateTokenRequestBody(type, codeOrToken, clientSecret, redirectUri, refresh);
-    using var response = this.SendRequest(req, body);
+    using var response = await this.SendRequestAsync(req, body);
     return this.ValidateToken(await this.ProcessResponseAsync(response), type);
   }
 
@@ -266,12 +264,8 @@ public class OAuth2 {
   }
 
   private async Task<HttpWebResponse> SendRequestAsync(HttpWebRequest req, string body) {
-#if NET || NETSTANDARD2_1_OR_GREATER
     var rs = req.GetRequestStream();
     await using var _ = rs.ConfigureAwait(false);
-#else
-    using var rs = req.GetRequestStream();
-#endif
     var bytes = Encoding.UTF8.GetBytes(body);
     await rs.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
     return (HttpWebResponse) await req.GetResponseAsync().ConfigureAwait(false);

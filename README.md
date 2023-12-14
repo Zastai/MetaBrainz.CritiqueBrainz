@@ -1,4 +1,4 @@
-# MetaBrainz.CritiqueBrainz [![Build Status](https://img.shields.io/appveyor/build/zastai/metabrainz-critiquebrainz)](https://ci.appveyor.com/project/Zastai/metabrainz-critiquebrainz) [![NuGet Version](https://img.shields.io/nuget/v/MetaBrainz.CritiqueBrainz)](https://www.nuget.org/packages/MetaBrainz.CritiqueBrainz)
+# MetaBrainz.CritiqueBrainz [![Build Status][CI-S]][CI-L] [![NuGet Version][NuGet-S]][NuGet-L]
 
 This is a library providing access to the
 [CritiqueBrainz API v1][api-reference].
@@ -7,6 +7,20 @@ This is a library providing access to the
 music reviews; it is based on data from [MusicBrainz][mb-home], an open
 music encyclopedia.
 
+This also contains OAuth2 functionality.
+
+## Release Notes
+
+These are available [on GitHub][release-notes].
+
+[CI-S]: https://github.com/Zastai/MetaBrainz.CritiqueBrainz/actions/workflows/build.yml/badge.svg
+[CI-L]: https://github.com/Zastai/MetaBrainz.CritiqueBrainz/actions/workflows/build.yml
+
+[NuGet-S]: https://img.shields.io/nuget/v/MetaBrainz.CritiqueBrainz
+[NuGet-L]: https://nuget.org/packages/MetaBrainz.CritiqueBrainz
+
+[api-reference]: https://critiquebrainz.readthedocs.io/api.html
 [home]: https://critiquebrainz.org/
 [mb-home]: https://musicbrainz.org/
-[api-reference]: https://critiquebrainz.readthedocs.io/api.html
+
+[release-notes]: https://github.com/Zastai/MetaBrainz.CritiqueBrainz/releases
