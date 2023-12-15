@@ -71,7 +71,7 @@ public sealed class OAuth2 : IDisposable {
       if (string.IsNullOrWhiteSpace(value)) {
         throw new ArgumentException("The default URL scheme must not be blank.", nameof(OAuth2.DefaultUrlScheme));
       }
-      OAuth2._defaultServer = value.Trim();
+      OAuth2._defaultUrlScheme = value.Trim();
     }
   }
 
@@ -159,7 +159,7 @@ public sealed class OAuth2 : IDisposable {
       if (string.IsNullOrWhiteSpace(value)) {
         throw new ArgumentException("The URL scheme must not be blank.", nameof(OAuth2.UrlScheme));
       }
-      this._server = value.Trim();
+      this._urlScheme = value.Trim();
     }
   }
 
