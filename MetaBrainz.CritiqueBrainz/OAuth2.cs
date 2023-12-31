@@ -175,7 +175,10 @@ public sealed class OAuth2 : IDisposable {
   /// The URI that should receive the authorization code; use <see cref="OutOfBandUri"/> for out-of-band requests.
   /// </param>
   /// <param name="scope">The authorization scopes that should be included in the authorization code.</param>
-  /// <param name="state">An optional string that will be included in the response sent to <paramref name="redirectUri"/>.</param>
+  /// <param name="state">
+  /// An optional random string that is used to protect against cross-site request forgery attacks. The server includes this
+  /// parameter in the request it sends to <paramref name="redirectUri"/>.
+  /// </param>
   /// <returns>The generated URI.</returns>
   public Uri CreateAuthorizationRequest(Uri redirectUri, AuthorizationScope scope, string? state = null) {
     if (scope == AuthorizationScope.None) {
@@ -270,10 +273,8 @@ public sealed class OAuth2 : IDisposable {
     }
   }
 
-  /// <summary>
-  /// Closes the underlying web service client in use by this OAuth2 client, if one has been created.<br/>
-  /// The next web service request will create a new client.
-  /// </summary>
+  /// <summary>Closes the underlying web service client in use by this OAuth2 client, if one has been created.</summary>
+  /// <remarks>The next web service request will create a new client.</remarks>
   /// <exception cref="InvalidOperationException">When this instance is using an explicitly provided client instance.</exception>
   public void Close() {
     if (!this._clientOwned) {
@@ -321,7 +322,7 @@ public sealed class OAuth2 : IDisposable {
     }
   }
 
-  /// <summary>Finalizes this instance.</summary>
+  /// <summary>Finalizes this instance, releasing any and all resources.</summary>
   ~OAuth2() {
     this.Dispose(false);
   }
@@ -335,29 +336,35 @@ public sealed class OAuth2 : IDisposable {
 
   private async Task<HttpResponseMessage> PerformRequestAsync(Uri uri, HttpMethod method, HttpContent? body,
                                                               CancellationToken cancellationToken) {
-    var ts = OAuth2.TraceSource;
-    ts.TraceEvent(TraceEventType.Verbose, 1, "WEB SERVICE REQUEST: {0} {1}", method.Method, uri);
-    var client = this.Client;
     using var request = new HttpRequestMessage(method, uri);
-    request.Content = body;
-    request.Headers.Accept.Add(OAuth2.AcceptHeader);
-    // Use whatever user agent the client has set, plus our own.
-    foreach (var userAgent in client.DefaultRequestHeaders.UserAgent) {
-      request.Headers.UserAgent.Add(userAgent);
+    var ts = OAuth2.TraceSource;
+    ts.TraceEvent(TraceEventType.Verbose, 1, "WEB SERVICE REQUEST: {0} {1}", method.Method, request.RequestUri);
+    var client = this.Client;
+    {
+      var headers = request.Headers;
+      headers.Accept.Add(OAuth2.AcceptHeader);
+      // Use whatever user agent the client has set, plus our own.
+      {
+        var userAgent = headers.UserAgent;
+        foreach (var ua in client.DefaultRequestHeaders.UserAgent) {
+          userAgent.Add(ua);
+        }
+        userAgent.Add(OAuth2.LibraryProductInfo);
+        userAgent.Add(OAuth2.LibraryComment);
+      }
     }
-    request.Headers.UserAgent.Add(OAuth2.LibraryProductInfo);
-    request.Headers.UserAgent.Add(OAuth2.LibraryComment);
     if (ts.Switch.ShouldTrace(TraceEventType.Verbose)) {
       ts.TraceEvent(TraceEventType.Verbose, 2, "HEADERS: {0}", TextUtils.FormatMultiLine(request.Headers.ToString()));
       if (body is not null) {
         var headers = body.Headers;
-        ts.TraceEvent(TraceEventType.Verbose, 3, "BODY ({0}): {1} bytes", headers.ContentType, headers.ContentLength ?? 0);
-        // FIXME: Should we trace the actual body text too?
+        ts.TraceEvent(TraceEventType.Verbose, 3, "BODY ({0}, {1} bytes): {2}", headers.ContentType, headers.ContentLength ?? 0,
+                      TextUtils.FormatMultiLine(await body.ReadAsStringAsync(cancellationToken)));
       }
       else {
         ts.TraceEvent(TraceEventType.Verbose, 3, "NO BODY");
       }
     }
+    request.Content = body;
     var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
     if (ts.Switch.ShouldTrace(TraceEventType.Verbose)) {
       ts.TraceEvent(TraceEventType.Verbose, 4, "WEB SERVICE RESPONSE: {0:D}/{0} '{1}' (v{2})", response.StatusCode,
@@ -389,9 +396,9 @@ public sealed class OAuth2 : IDisposable {
                                                       CancellationToken cancellationToken) {
     var body = new StringBuilder();
     body.Append("client_id=").Append(Uri.EscapeDataString(this.ClientId));
-    body.Append("&client_secret=").Append(Uri.EscapeDataString(clientSecret));
-    body.Append("&grant_type=refresh_token");
-    body.Append("&refresh_token=").Append(Uri.EscapeDataString(codeOrToken));
+    body.Append("&\nclient_secret=").Append(Uri.EscapeDataString(clientSecret));
+    body.Append("&\ngrant_type=refresh_token");
+    body.Append("&\nrefresh_token=").Append(Uri.EscapeDataString(codeOrToken));
     return this.PostAsync("bearer", body.ToString(), cancellationToken);
   }
 
@@ -399,10 +406,10 @@ public sealed class OAuth2 : IDisposable {
                                                       CancellationToken cancellationToken) {
     var body = new StringBuilder();
     body.Append("client_id=").Append(Uri.EscapeDataString(this.ClientId));
-    body.Append("&client_secret=").Append(Uri.EscapeDataString(clientSecret));
-    body.Append("&grant_type=authorization_code");
-    body.Append("&code=").Append(Uri.EscapeDataString(codeOrToken));
-    body.Append("&redirect_uri=").Append(Uri.EscapeDataString(redirectUri.ToString()));
+    body.Append("&\nclient_secret=").Append(Uri.EscapeDataString(clientSecret));
+    body.Append("&\ngrant_type=authorization_code");
+    body.Append("&\ncode=").Append(Uri.EscapeDataString(codeOrToken));
+    body.Append("&\nredirect_uri=").Append(Uri.EscapeDataString(redirectUri.ToString()));
     return this.PostAsync("bearer", body.ToString(), cancellationToken);
   }
 
