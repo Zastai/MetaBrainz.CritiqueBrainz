@@ -1,14 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project>
 
-  <Sdk Name="MetaBrainz.Build.Sdk" Version="3.1.2" />
+  <Sdk Name="MetaBrainz.Build.Sdk" Version="4.0.0" />
 
   <PropertyGroup>
     <Authors>Zastai</Authors>
     <Title>CritiqueBrainz Web Service Client Library</Title>
     <Description>This package provides classes for accessing the CritiqueBrainz API (v1).</Description>
     <PackageCopyrightOwners>Tim Van Holder</PackageCopyrightOwners>
-    <PackageCopyrightYears>2020, 2023</PackageCopyrightYears>
+    <PackageCopyrightYears>2020, 2023, 2025</PackageCopyrightYears>
     <PackageRepositoryName>MetaBrainz.CritiqueBrainz</PackageRepositoryName>
     <PackageTags>CritiqueBrainz music reviews</PackageTags>
     <Version>1.0.0-pre</Version>
